@@ -1,0 +1,119 @@
+--Populate property adress data.
+    -- See if either one of a duplicate ParcelID has a null value for property address,
+        -- if so populate it with the property address of the duplicate value which has a property address 
+
+select a.parcelid, a.propertyaddress, b.parcelid, b.propertyaddress, ISNULL(a.propertyaddress,b.propertyaddress)
+From Master..NashvilleHousing a
+Join Master..NashvilleHousing b
+    on a.ParcelID = b.ParcelID 
+    and a.uniqueid <> b.uniqueid
+Where a.propertyaddress is null 
+
+UPDATE a
+Set PropertyAddress = ISNULL(a.propertyaddress,b.propertyaddress)
+From Master..NashvilleHousing a
+Join Master..NashvilleHousing b
+    on a.ParcelID = b.ParcelID 
+    and a.uniqueid <> b.uniqueid
+Where a.propertyaddress is null
+
+-- Separate Adress into Adress and City columns
+    -- Create separate columns for the Adress and City 
+
+SELECT
+substring(PropertyAddress, 1, Charindex(',', PropertyAddress) -1) as Address,
+substring(PropertyAddress, Charindex(',', PropertyAddress) +1, LEN(PropertyAddress)) as Address
+From Master..NashvilleHousing
+
+-- Add the new columns to existing table and update the table
+
+ALter Table NashvilleHousing
+Add StreetAddress NVARCHAR(255)
+
+Update NashvilleHousing
+Set StreetAddress = substring(PropertyAddress, 1, Charindex(',', PropertyAddress) -1) 
+
+ALter Table NashvilleHousing
+Add City NVARCHAR(255)
+
+Update NashvilleHousing
+Set City = substring(PropertyAddress, Charindex(',', PropertyAddress) +1, LEN(PropertyAddress))
+
+Select *
+From MAster..NashvilleHousing
+
+-- Separate OwnerAdress into Adress, City and Sate columns using alternative method
+    -- Create separate columns for the Adress and City 
+
+SELECT
+PARSENAME(Replace(OwnerAddress, ',', '.'), 3),
+PARSENAME(Replace(OwnerAddress, ',', '.'), 2),
+PARSENAME(Replace(OwnerAddress, ',', '.'), 1)
+From MAster..NashvilleHousing
+
+-- Add the new columns to existing table and update the table
+
+ALter Table NashvilleHousing
+Add OwnerStreet NVARCHAR(255)
+
+Update NashvilleHousing
+Set OwnerStreet = PARSENAME(Replace(OwnerAddress, ',', '.'), 3)
+
+ALter Table NashvilleHousing
+Add OwnerCity NVARCHAR(255)
+
+Update NashvilleHousing
+Set OwnerCity = PARSENAME(Replace(OwnerAddress, ',', '.'), 2)
+
+ALter Table NashvilleHousing
+Add OwnerState NVARCHAR(255)
+
+Update NashvilleHousing
+Set OwnerState = PARSENAME(Replace(OwnerAddress, ',', '.'), 1)
+
+--Change Y and N to Yes and No in SoldasVacant Column
+
+Select SoldasVacant,
+    Case When SoldasVacant = 'Y' then 'Yes'
+         When SoldasVacant = 'N' then 'No'
+         Else SoldasVacant
+         END
+From Master..NashvilleHousing
+
+Update NashvilleHousing
+Set SoldAsVacant =  Case When SoldasVacant = 'Y' then 'Yes'
+         When SoldasVacant = 'N' then 'No'
+         Else SoldasVacant
+         END
+
+
+--Remove Duplicates  
+    --Creat CTE
+
+WITH RowNumCTE AS(
+Select *,
+	ROW_NUMBER() OVER (
+	PARTITION BY ParcelID,
+				 PropertyAddress,
+				 SalePrice,
+				 SaleDate,
+				 LegalReference
+				 ORDER BY
+					UniqueID
+					) row_num
+
+From Master..NashvilleHousing
+)
+Delete 
+From RowNumCTE
+Where row_num > 1
+
+--Deletr unusable columns
+
+ALTER TABLE Master.. NashvilleHousing
+Drop Column OwnerAddress, PropertyAddress
+
+--Display cleaned data
+
+Select *
+From Master..NashvilleHousing 
